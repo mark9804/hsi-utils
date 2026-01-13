@@ -137,10 +137,10 @@ import io
 def draw_plot(
     left_axis_plots: List[PlotInput],
     left_axis_label: str,
-    right_axis_plots: List[PlotInput],
-    right_axis_label: str,
     x_axis_label: str,
     title: str,
+    right_axis_plots: Optional[List[PlotInput]] = None,
+    right_axis_label: Optional[str] = None,
     output_path: Optional[str] = None,
     left_axis_baseline: Union[float, BaselineInput, None] = None,
     right_axis_baseline: Union[float, BaselineInput, None] = None,
