@@ -1,4 +1,5 @@
 from .dataset_utils import (
+    HSITrainDataset,
     LoadTraining,
     LoadTest,
     LoadMeasurement,

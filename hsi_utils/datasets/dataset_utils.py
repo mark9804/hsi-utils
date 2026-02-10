@@ -7,9 +7,62 @@ from torch.utils.data import Dataset
 from typing import List, Tuple, Union
 
 
+class HSIDataset(Dataset):
+    """
+    Lazy-loading Dataset for HSI .mat files.
+
+    Only stores file paths at init; each __getitem__ reads a single .mat file.
+    Configurable key lookup order, normalization scale, and filename filtering.
+    """
+
+    def __init__(
+        self,
+        path: str,
+        keys: Tuple[str, ...] = ("img",),
+        scale: float = 1.0,
+        max_scene: int | None = None,
+    ):
+        self.keys = keys
+        self.scale = scale
+        self.paths = []
+        for name in sorted(os.listdir(path)):
+            if not name.endswith(".mat"):
+                continue
+            if max_scene is not None:
+                try:
+                    scene_num = int(name.split(".")[0][5:])
+                except (ValueError, IndexError):
+                    continue
+                if scene_num > max_scene:
+                    continue
+            self.paths.append(os.path.join(path, name))
+
+    def __len__(self) -> int:
+        return len(self.paths)
+
+    def __getitem__(self, idx: int) -> torch.Tensor:
+        mat = sio.loadmat(self.paths[idx])
+        for key in self.keys:
+            if key in mat:
+                img = mat[key].astype(np.float32) * self.scale
+                # [H, W, C] -> [C, H, W]
+                return torch.from_numpy(img.transpose(2, 0, 1))
+        raise KeyError(f"No valid key in {self.paths[idx]}, tried {self.keys}")
+
+
+def HSITrainDataset(path: str, max_scene: int = 205) -> HSIDataset:
+    """Convenience constructor for training datasets."""
+    return HSIDataset(
+        path,
+        keys=("img_expand", "img", "data_slice"),
+        scale=1.0 / 65536.0,
+        max_scene=max_scene,
+    )
+
+
 def LoadTraining(path: str) -> List[np.ndarray]:
     """
-    Load training data from directory.
+    Load training data from directory (legacy, prefer HSIDataset + DataLoader).
 
     Args:
         path: Directory path.
@@ -51,7 +104,7 @@ def LoadTraining(path: str) -> List[np.ndarray]:
 
 def LoadTest(path_test: str) -> torch.Tensor:
     """
-    Load test data.
+    Load test data (legacy, prefer HSIDataset + DataLoader).
 
     Args:
         path_test: Path to test data directory.
@@ -68,28 +121,6 @@ def LoadTest(path_test: str) -> torch.Tensor:
         test_data[i, :, :, :] = img
     test_data = torch.from_numpy(np.transpose(test_data, (0, 3, 1, 2)))
     return test_data
-
-
-class HSIDataset(Dataset):
-    """
-    Lazy-loading Dataset for HSI .mat files.
-
-    Only stores file paths at init; each __getitem__ reads a single .mat file.
-    """
-
-    def __init__(self, path: str, key: str = "img"):
-        self.paths = sorted(
-            os.path.join(path, f) for f in os.listdir(path) if f.endswith(".mat")
-        )
-        self.key = key
-
-    def __len__(self) -> int:
-        return len(self.paths)
-
-    def __getitem__(self, idx: int) -> torch.Tensor:
-        img = sio.loadmat(self.paths[idx])[self.key]  # [H, W, C]
-        # [C, H, W], float32
-        return torch.from_numpy(img.transpose(2, 0, 1)).float()
 
 
 def LoadMeasurement(path_test_meas: str) -> torch.Tensor:

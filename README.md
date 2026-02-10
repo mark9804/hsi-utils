@@ -33,7 +33,7 @@ pip install -e .
 
 ### Example usage
 
-You can find an example repository [here](https://github.com/RikkyoMLP/python-monorepo-example).
+You can find an example monorepo [here](https://github.com/RikkyoMLP/python-monorepo-example).
 
 ## Modules & API Reference
 
@@ -48,19 +48,38 @@ Utilities for loading and merging configurations.
 
 ### Datasets (`hsi_utils.datasets`)
 
-Functions for loading, processing, and augmenting hyperspectral datasets.
+Classes and functions for loading, processing, and augmenting hyperspectral datasets.
 
-- `LoadTraining(path: str) -> List[np.ndarray]`
-  Loads training scenes from a specified directory.
+- `HSIDataset(path, keys=("img",), scale=1.0, max_scene=None)` -- `torch.utils.data.Dataset`
+  Lazy-loading dataset for HSI `.mat` files. Configurable key lookup order, normalization scale, and optional scene number filtering. Each item is a `[C, H, W]` float32 tensor.
 
-- `LoadTest(path_test: str) -> torch.Tensor`
-  Loads test data and formats it into a tensor of shape `[N, 28, 256, 256]`.
+- `HSITrainDataset(path, max_scene=205)` -- Convenience constructor
+  Returns an `HSIDataset` pre-configured for training: keys=`("img_expand", "img", "data_slice")`, scale=`1/65536`.
+
+- `LoadTraining(path)` / `LoadTest(path)` -- Legacy, prefer `HSIDataset` + `DataLoader`
 
 - `LoadMeasurement(path_test_meas: str) -> torch.Tensor`
   Loads pre-simulated measurement data for testing.
 
 - `shuffle_crop(train_data: List[np.ndarray], batch_size: int, crop_size: int = 256, argument: bool = True) -> torch.Tensor`
   Performs random cropping and data augmentation (rotation, flipping, and mosaic/stitching) on the training data.
+
+#### Example: Loading data with DataLoader
+
+```python
+from torch.utils.data import DataLoader
+from hsi_utils.datasets import HSIDataset, HSITrainDataset
+
+# Test (default: key="img", no normalization)
+test_loader = DataLoader(HSIDataset("/path/to/test"), batch_size=1)
+
+# Training (fallback keys, /65536 normalization, scene filtering)
+train_loader = DataLoader(HSITrainDataset("/path/to/train"), batch_size=4, shuffle=True)
+
+for batch in train_loader:  # batch: [B, C, H, W], float32
+    batch = batch.cuda()
+    ...
+```
 
 ### Logger (`hsi_utils.logger`)
 
