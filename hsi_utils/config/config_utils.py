@@ -27,6 +27,8 @@ def load_merge_config(
     )
     if len(args) > 0 and isinstance(args, dict):
         args = OmegaConf.create(args)
+    elif len(args) == 0:
+        args = OmegaConf.create()
     else:
         args = OmegaConf.from_cli(args)
 
