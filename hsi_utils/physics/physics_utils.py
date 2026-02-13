@@ -74,7 +74,7 @@ def gen_meas_torch(
     return meas
 
 
-def init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> torch.Tensor:
+def init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> tuple[torch.Tensor, torch.Tensor]:
     """
     Initialize measurement from ground truth and mask.
 
@@ -87,8 +87,6 @@ def init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> torch
         torch.Tensor: Generated measurement.
     """
     if input_setting == "H":
-        # Generate Y first, then convert to H
-        # But we need to keep Y for MC loss!
         Y_meas = gen_meas_torch(gt, mask, Y2H=False, mul_mask=False)
         Y_meas_normalized = Y_meas / 28 * 2  # Normalize like in forward_model
         H_meas = gen_meas_torch(gt, mask, Y2H=True, mul_mask=False)
@@ -100,5 +98,7 @@ def init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> torch
         return HM_meas, Y_meas_normalized
     elif input_setting == "Y":
         input_meas = gen_meas_torch(gt, mask, Y2H=False, mul_mask=True)
-        # For Y input, the target is just input_meas / 28 * 2
-        return input_meas, None
+        Y_meas_normalized = input_meas / 28 * 2
+        return input_meas, Y_meas_normalized
+    else:
+        raise NotImplementedError("Unknown input setting")
