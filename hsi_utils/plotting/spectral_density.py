@@ -118,7 +118,7 @@ def draw_spectral_density(
             wavelengths,
             spectrum,
             marker=".",
-            markersize=16,
+            # markersize=16,
             linewidth=2.5,
             color=inp.color,
             label=label,
