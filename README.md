@@ -94,6 +94,16 @@ Utilities for logging and logging exceptions.
 - `log_exception(func: Callable[..., Any]) -> Callable[..., Any]`
   Decorator to capture exceptions raised in the decorated function, log the full traceback to the configured logger, and re-raise the exception.
 
+### Loss Functions (`hsi_utils.loss_functions`)
+
+Regularization losses for HSI reconstruction.
+
+- `tv(x: torch.Tensor) -> torch.Tensor`
+  Total variation loss. Computes the mean absolute image gradient (horizontal + vertical) via `torchmetrics.functional.image.image_gradients`.
+
+- `nuc_loss_v2(x: torch.Tensor, patch_size: int, eps: float = 1e-8) -> torch.Tensor`
+  Log-nuclear-norm loss. Unfolds the input into overlapping patches, computes SVD singular values per patch, and returns `mean(log(S + eps))`. Promotes spectral low-rank structure.
+
 ### Masks (`hsi_utils.masks`)
 
 Utilities for generating and managing optical masks, specifically for CASSI systems.
@@ -115,6 +125,13 @@ Utilities for calculating metrics such as PSNR and SSIM.
 - `ssim(img: torch.Tensor, ref: torch.Tensor) -> float`
   Calculates the SSIM between two images.
 
+### Misc (`hsi_utils.misc`)
+
+Small standalone utilities.
+
+- `is_none(val: Any) -> bool`
+  Returns `True` if `val` is `None` or a string that reads `"none"` (case-insensitive, stripped). Useful for CLI/config parsing where `None` may arrive as a string.
+
 ### Models (`hsi_utils.models`)
 
 - `get_nb_trainable_parameters(model: nn.Module) -> tuple[int, int]`
@@ -135,6 +152,65 @@ Implements the physical forward models for CASSI (Coded Aperture Snapshot Spectr
 
 - `init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> torch.Tensor`
   Wrapper to generate measurements from ground truth.
+
+### Plotting (`hsi_utils.plotting`)
+
+Visualization tools for optimization curves and spectral analysis.
+
+#### General Plotting
+
+- `PlotInput` -- Dataclass
+  Describes one data series on a plot. Fields: `data` (array), `identifier` (legend label), `show_max`/`show_min` (mark extrema), `line_color`, `line_style`, `line_width`, `fill_color`.
+
+- `BaselineInput` -- Dataclass
+  Describes a horizontal baseline reference line. Fields: `value`, `label`, `line_color`, `line_style`, `line_width`, `fill_color`, `fill_alpha`.
+
+- `draw_plot(left_axis_plots, left_axis_label, x_axis_label, title, ...) -> PIL.Image.Image`
+  Generic dual Y-axis plotting function. Accepts two sets of `PlotInput` (left/right axis), optional `BaselineInput` for each axis. Returns a PIL Image and optionally saves to `output_path`.
+
+#### Spectral Density
+
+- `SpectralInput` -- Dataclass
+  One HSI cube with metadata for spectral density comparison. Fields: `cube` (`(H,W,C)` array), `label`, `color`, `is_ground_truth`.
+
+- `compute_spectral_density(cube: np.ndarray, roi: tuple[int,int,int,int], clip_max: float | None = None) -> np.ndarray`
+  Extracts mean spectral density from an ROI, normalized to max=1. Returns a `(C,)` float64 array.
+
+- `draw_spectral_density(inputs: list[SpectralInput], roi, wavelengths=None, clip_max=None, output_path=None, figsize=(8,6)) -> PIL.Image.Image`
+  Draws spectral density curves for multiple reconstructions. Computes Pearson correlation of each prediction against the ground truth and displays it in the legend.
+
+### Rendering (`hsi_utils.rendering`)
+
+HSI-to-image rendering utilities for visualization and figure generation.
+
+#### Pseudo-coloring
+
+- `colorize_channel(gray_image: np.ndarray, wavelength_nm: float, brightness: float = 5.0) -> np.ndarray`
+  Applies wavelength-dependent pseudo-coloring to a single spectral band using CIE 1964 color matching functions. Matches the MATLAB `dispCubeAshwin.m` algorithm. Returns `(H, W, 3)` uint8 RGB.
+
+- `colorize_cube(cube: np.ndarray, wavelengths=None, brightness=5.0, channels=None) -> list[tuple[float, np.ndarray]]`
+  Colorizes multiple channels from an HSI cube. Returns a list of `(wavelength_nm, colored_image)` tuples.
+
+#### RGB Reconstruction
+
+- `hsi_to_rgb(cube: np.ndarray, wavelengths=None, gamma=2.2) -> np.ndarray`
+  Reconstructs an sRGB image from a multi-band HSI cube via CIE 1964 spectral integration + XYZ-to-sRGB conversion. Returns `(H, W, 3)` uint8.
+
+- `load_or_reconstruct_rgb(mat_data: dict, cube_key="truth", rgb_key="rgb", wavelengths=None) -> np.ndarray`
+  Loads a pre-stored RGB from `.mat` data if available, otherwise falls back to `hsi_to_rgb`.
+
+#### Magnified Inset
+
+- `InsetPosition` -- Enum (`TOP_LEFT`, `TOP_RIGHT`, `BOTTOM_LEFT`, `BOTTOM_RIGHT`)
+  Corner placement for zoom insets.
+
+- `draw_magnified_inset(image: np.ndarray, roi, inset_position=InsetPosition.TOP_LEFT, inset_scale=3.0, border_color=(255,255,0), border_width=2, margin=4) -> np.ndarray`
+  Draws a zoomed inset overlay on an RGB image. Highlights the source ROI with a rectangle, scales and pastes it at the specified corner. Returns `(H, W, 3)` uint8.
+
+#### Measurement Rendering
+
+- `render_measurement(measurement: np.ndarray) -> np.ndarray`
+  Min-max normalizes a raw CASSI measurement and returns a `(H, W)` uint8 grayscale image.
 
 ### Templates (`hsi_utils.templates`)
 
