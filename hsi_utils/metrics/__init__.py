@@ -73,3 +73,40 @@ def lpips_loss(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
     rgb_target = _hsi_to_rgb_tensor(target).unsqueeze(0) * 2 - 1
     with torch.no_grad():
         return net(rgb_pred, rgb_target).squeeze()
+
+
+# ---------- Differentiable LPIPS (for use as training loss) ----------
+
+_hsi_to_rgb_fixed_scale = None  # (3,) fixed normalizer
+
+
+def _hsi_to_rgb_tensor_stable(hsi: torch.Tensor) -> torch.Tensor:
+    """Convert (C, H, W) HSI tensor to (3, H, W) sRGB tensor in [0, 1].
+
+    Uses a fixed (data-independent) normalizer instead of per-image max,
+    so gradients are stable for backprop.
+    """
+    global _hsi_to_rgb_fixed_scale
+    W = _get_hsi_to_rgb_weights(hsi.device)  # (28, 3)
+
+    # Precompute fixed scale once: theoretical max when all bands = 1
+    if _hsi_to_rgb_fixed_scale is None or _hsi_to_rgb_fixed_scale.device != hsi.device:
+        _hsi_to_rgb_fixed_scale = W.clamp(min=0).sum(dim=0)  # (3,)
+
+    rgb = torch.einsum("chw,cd->hwd", hsi.clamp(0, 1), W)
+    rgb = rgb / _hsi_to_rgb_fixed_scale  # (H, W, 3), data-independent
+    rgb = rgb.clamp(0, 1).pow(1.0 / 2.2)
+    return rgb.permute(2, 0, 1)  # (3, H, W)
+
+
+def lpips_loss_grad(pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+    """Differentiable LPIPS loss between two HSI tensors. For training only.
+
+    Same as lpips_loss but gradients flow through pred.
+    Uses fixed normalization for stable backprop.
+    """
+    net = _get_lpips_net()
+    rgb_pred = _hsi_to_rgb_tensor_stable(pred).unsqueeze(0) * 2 - 1
+    # Target doesn't need gradients
+    rgb_target = _hsi_to_rgb_tensor_stable(target.detach()).unsqueeze(0) * 2 - 1
+    return net(rgb_pred, rgb_target).squeeze()
