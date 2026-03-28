@@ -16,8 +16,11 @@ _hsi_to_rgb_weights = None  # (28, 3) CIE spectral -> XYZ -> sRGB
 def _get_lpips_net():
     global _lpips_net # Init singleton LPIPS network instance
     if _lpips_net is None:
+        import warnings
         import lpips
-        _lpips_net = lpips.LPIPS(net="vgg", verbose=False).cuda().eval()
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
+            _lpips_net = lpips.LPIPS(net="vgg", verbose=False).cuda().eval()
         for p in _lpips_net.parameters():
             p.requires_grad = False
     return _lpips_net
@@ -53,7 +56,10 @@ def _hsi_to_rgb_tensor(hsi: torch.Tensor) -> torch.Tensor:
     max_val = rgb.max()
     if max_val > 0:
         rgb = rgb / max_val
-    rgb = rgb.pow(1.0 / 2.2).clamp(0, 1)
+    # if rgb = 0, derivative of rgb.pow(1.0 / 2.2) -> inf
+    # therefore a small epsilon should be added to rgb before pow
+    # rgb = rgb.pow(1.0 / 2.2).clamp(0, 1)
+    rgb = (rgb.clamp(0, 1) + 1e-6).pow(1.0 / 2.2)
     return rgb.permute(2, 0, 1)  # (3, H, W)
 
 
@@ -95,7 +101,8 @@ def _hsi_to_rgb_tensor_stable(hsi: torch.Tensor) -> torch.Tensor:
 
     rgb = torch.einsum("chw,cd->hwd", hsi.clamp(0, 1), W)
     rgb = rgb / _hsi_to_rgb_fixed_scale  # (H, W, 3), data-independent
-    rgb = rgb.clamp(0, 1).pow(1.0 / 2.2)
+    # eps avoids pow(1/2.2) gradient explosion at zero (d/dx x^0.45 -> inf as x -> 0)
+    rgb = (rgb.clamp(0, 1) + 1e-6).pow(1.0 / 2.2)
     return rgb.permute(2, 0, 1)  # (3, H, W)
 
 
