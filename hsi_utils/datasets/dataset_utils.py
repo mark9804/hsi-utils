@@ -3,6 +3,8 @@ import random
 import scipy.io as sio
 import numpy as np
 import torch
+import tqdm
+from concurrent.futures import ThreadPoolExecutor
 from torch.utils.data import Dataset
 from typing import List, Tuple, Union
 
@@ -60,64 +62,83 @@ def HSITrainDataset(path: str, max_scene: int = 205) -> HSIDataset:
     )
 
 
-def LoadTraining(path: str) -> List[np.ndarray]:
+def _load_single_training_scene(scene_path):
+    """Load a single .mat training scene. Returns np.float32 array or None."""
+    img_dict = sio.loadmat(scene_path)
+    if "img_expand" in img_dict:
+        img = img_dict["img_expand"] / 65536.0
+    elif "img" in img_dict:
+        img = img_dict["img"] / 65536.0
+    elif "data_slice" in img_dict:
+        img = img_dict["data_slice"] / 65536.0
+    else:
+        return None
+    return img.astype(np.float32)
+
+
+def _load_single_test_scene(scene_path):
+    """Load a single .mat test scene. Returns np.ndarray."""
+    return sio.loadmat(scene_path)["img"]
+
+
+def LoadTrainingLegacy(path: str, num_workers: int = 8) -> List[np.ndarray]:
     """
-    Load training data from directory (legacy, prefer HSIDataset + DataLoader).
+    Load training data from directory with multithreading.
 
     Args:
         path: Directory path.
+        num_workers: Number of threads for parallel loading.
 
     Returns:
         List[np.ndarray]: List of loaded images (numpy arrays).
     """
-    imgs = []
-    scene_list = os.listdir(path)
-    scene_list.sort()
+    scene_list = sorted(os.listdir(path))
     print("training sences:", len(scene_list))
-    for i in range(len(scene_list)):
-        scene_path = os.path.join(path, scene_list[i])
 
-        # Parse scene number from filename (assuming format like 'scene001.mat')
-        try:
-            scene_num = int(scene_list[i].split(".")[0][5:])
-        except ValueError:
+    valid_paths = []
+    for name in scene_list:
+        if "mat" not in name:
             continue
-
+        try:
+            scene_num = int(name.split(".")[0][5:])
+        except (ValueError, IndexError):
+            continue
         if scene_num <= 205:
-            if "mat" not in scene_path:
-                continue
-            img_dict = sio.loadmat(scene_path)
-            if "img_expand" in img_dict:
-                img = img_dict["img_expand"] / 65536.0
-            elif "img" in img_dict:
-                img = img_dict["img"] / 65536.0
-            elif "data_slice" in img_dict:
-                img = img_dict["data_slice"] / 65536.0
-            else:
-                continue
+            valid_paths.append(os.path.join(path, name))
 
-            img = img.astype(np.float32)
-            imgs.append(img)
-            print("Sence {} is loaded. {}".format(i, scene_list[i]))
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        imgs = list(tqdm.tqdm(
+            executor.map(_load_single_training_scene, valid_paths),
+            total=len(valid_paths),
+        ))
+
+    imgs = [img for img in imgs if img is not None]
+    print("{} training scenes loaded.".format(len(imgs)))
     return imgs
 
 
-def LoadTest(path_test: str) -> torch.Tensor:
+def LoadTestLegacy(path_test: str, num_workers: int = 8) -> torch.Tensor:
     """
-    Load test data (legacy, prefer HSIDataset + DataLoader).
+    Load test data with multithreading.
 
     Args:
         path_test: Path to test data directory.
+        num_workers: Number of threads for parallel loading.
 
     Returns:
         torch.Tensor: Test data tensor of shape [N, 28, 256, 256].
     """
-    scene_list = os.listdir(path_test)
-    scene_list.sort()
-    test_data = np.zeros((len(scene_list), 256, 256, 28))
-    for i in range(len(scene_list)):
-        scene_path = os.path.join(path_test, scene_list[i])
-        img = sio.loadmat(scene_path)["img"]
+    scene_list = sorted(os.listdir(path_test))
+    scene_paths = [os.path.join(path_test, name) for name in scene_list]
+
+    with ThreadPoolExecutor(max_workers=num_workers) as executor:
+        results = list(tqdm.tqdm(
+            executor.map(_load_single_test_scene, scene_paths),
+            total=len(scene_paths),
+        ))
+
+    test_data = np.zeros((len(results), 256, 256, 28))
+    for i, img in enumerate(results):
         test_data[i, :, :, :] = img
     test_data = torch.from_numpy(np.transpose(test_data, (0, 3, 1, 2)))
     return test_data

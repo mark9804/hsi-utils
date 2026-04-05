@@ -1,7 +1,9 @@
 from .dataset_utils import (
     HSITrainDataset,
-    LoadTraining,
-    LoadTest,
+    LoadTrainingLegacy,
+    LoadTrainingLegacy as LoadTraining,
+    LoadTestLegacy,
+    LoadTestLegacy as LoadTest,
     LoadMeasurement,
     shuffle_crop,
     HSIDataset,
