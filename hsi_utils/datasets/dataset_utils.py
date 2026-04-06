@@ -7,6 +7,7 @@ import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from torch.utils.data import Dataset
 from typing import List, Tuple, Union
+from pathlib import Path
 
 
 class HSIDataset(Dataset):
@@ -62,6 +63,66 @@ def HSITrainDataset(path: str, max_scene: int = 205) -> HSIDataset:
     )
 
 
+def _describe_value(val):
+    """Recursively describe the structure of a value from a .mat file."""
+    if isinstance(val, np.ndarray):
+        # Structured or object arrays: recurse into dtype fields
+        if val.dtype.names:
+            return {
+                "type": "ndarray",
+                "dtype": str(val.dtype),
+                "shape": val.shape,
+                "fields": {name: _describe_value(val[name]) for name in val.dtype.names},
+            }
+        # Squeeze scalar object arrays (MATLAB cells / nested structs)
+        if val.dtype == object:
+            flat = val.flat
+            if val.size == 1:
+                return _describe_value(flat[0])
+            return {
+                "type": "ndarray[object]",
+                "shape": val.shape,
+                "elements": [_describe_value(flat[i]) for i in range(min(val.size, 8))],
+            }
+        return {"type": "ndarray", "dtype": str(val.dtype), "shape": val.shape}
+    if isinstance(val, dict):
+        return {k: _describe_value(v) for k, v in val.items()}
+    if isinstance(val, (list, tuple)):
+        return [_describe_value(v) for v in val[:8]]
+    if isinstance(val, (bytes, str)):
+        return type(val).__name__
+    # Scalar numbers, etc.
+    return type(val).__name__
+
+
+def load_raw_data(path: Union[str, Path]):
+    """
+    Read one .mat file and return structured data.
+
+    Args:
+        path: Path to the .mat file.
+
+    Returns:
+        {
+            "data": Any,
+            "metadata": {
+                "keys": List[str],
+                "structure": nested description of each key's value,
+            },
+        }
+    """
+    mat = sio.loadmat(path)
+    return {
+        "data": mat,
+        "metadata": {
+            "keys": list(mat.keys()),
+            "structure": {
+                key: _describe_value(mat[key]) for key in mat.keys()
+            }
+        },
+    }
+
+
 def _load_single_training_scene(scene_path):
     """Load a single .mat training scene. Returns np.float32 array or None."""
     img_dict = sio.loadmat(scene_path)
@@ -107,10 +168,12 @@ def LoadTrainingLegacy(path: str, num_workers: int = 8) -> List[np.ndarray]:
             valid_paths.append(os.path.join(path, name))
 
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        imgs = list(tqdm.tqdm(
-            executor.map(_load_single_training_scene, valid_paths),
-            total=len(valid_paths),
-        ))
+        imgs = list(
+            tqdm.tqdm(
+                executor.map(_load_single_training_scene, valid_paths),
+                total=len(valid_paths),
+            )
+        )
 
     imgs = [img for img in imgs if img is not None]
     print("{} training scenes loaded.".format(len(imgs)))
@@ -132,10 +195,12 @@ def LoadTestLegacy(path_test: str, num_workers: int = 8) -> torch.Tensor:
     scene_paths = [os.path.join(path_test, name) for name in scene_list]
 
     with ThreadPoolExecutor(max_workers=num_workers) as executor:
-        results = list(tqdm.tqdm(
-            executor.map(_load_single_test_scene, scene_paths),
-            total=len(scene_paths),
-        ))
+        results = list(
+            tqdm.tqdm(
+                executor.map(_load_single_test_scene, scene_paths),
+                total=len(scene_paths),
+            )
+        )
 
     test_data = np.zeros((len(results), 256, 256, 28))
     for i, img in enumerate(results):

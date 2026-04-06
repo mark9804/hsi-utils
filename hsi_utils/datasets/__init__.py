@@ -1,4 +1,5 @@
 from .dataset_utils import (
+    load_raw_data,
     HSITrainDataset,
     LoadTrainingLegacy,
     LoadTrainingLegacy as LoadTraining,
