@@ -102,3 +102,29 @@ def init_meas(gt: torch.Tensor, mask: torch.Tensor, input_setting: str) -> tuple
         return input_meas, Y_meas_normalized
     else:
         raise NotImplementedError("Unknown input setting")
+
+
+def forward_model(x: torch.Tensor, Phi: torch.Tensor, step: int = 2) -> torch.Tensor:
+    """
+    Forward physical model: converts HSI cube to compressed measurement Y.
+    This simulates the CASSI imaging process.
+
+    Args:
+        x: HSI cube [B, C, H, W]
+        Phi: Mask (either shifted or unshifted)
+        step: Shift step
+
+    Returns:
+        Y: Compressed measurement [B, H, W_shifted]
+    """
+    nC = Phi.shape[1]
+    x_shifted = shift(x, step)
+
+    # Phi already shifted (matches shifted width) vs unshifted (needs shifting)
+    if Phi.shape[-1] == x_shifted.shape[-1]:
+        Phi_shifted = Phi
+    else:
+        Phi_shifted = shift(Phi, step)
+
+    mea = torch.sum(x_shifted * Phi_shifted, dim=1) / nC * 2
+    return mea
