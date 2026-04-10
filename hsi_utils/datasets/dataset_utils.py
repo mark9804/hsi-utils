@@ -6,7 +6,7 @@ import torch
 import tqdm
 from concurrent.futures import ThreadPoolExecutor
 from torch.utils.data import Dataset
-from typing import List, Tuple, Union
+from typing import List, Tuple, Union, Dict, Any, TypedDict
 from pathlib import Path
 
 
@@ -43,7 +43,7 @@ class HSIDataset(Dataset):
     def __len__(self) -> int:
         return len(self.paths)
 
-    def __getitem__(self, idx: int) -> torch.Tensor:
+    def __getitem__(self, idx: int) -> torch.Tensor:  # type: ignore  # fix later
         mat = sio.loadmat(self.paths[idx])
         for key in self.keys:
             if key in mat:
@@ -95,7 +95,17 @@ def _describe_value(val):
     return type(val).__name__
 
 
-def load_raw_data(path: Union[str, Path]):
+class MatMetadata(TypedDict):
+    keys: List[str]
+    structure: Dict[str, Any]
+
+
+class MatFileInfo(TypedDict):
+    data: Dict[str, Any]
+    metadata: MatMetadata
+
+
+def load_raw_data(path: Union[str, Path]) -> MatFileInfo:
     """
     Read one .mat file and return structured data.
 
