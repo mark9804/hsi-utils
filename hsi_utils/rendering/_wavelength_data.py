@@ -42,6 +42,26 @@ WAVELENGTHS_28 = np.array(
     ]
 )
 
+# 31-band wavelengths (nm) used in ICVL/ARAD HSI datasets (400-700nm, 10nm spacing)
+WAVELENGTHS_31 = np.arange(400, 710, 10, dtype=np.float64)
+
+_WAVELENGTH_TABLE: dict[int, np.ndarray] = {
+    28: WAVELENGTHS_28,
+    31: WAVELENGTHS_31,
+}
+
+
+def get_wavelengths(n_channels: int) -> np.ndarray:
+    """Return the standard wavelength array for a given channel count."""
+    wl = _WAVELENGTH_TABLE.get(n_channels)
+    if wl is None:
+        raise ValueError(
+            f"No known wavelength set for {n_channels} channels "
+            f"(supported: {sorted(_WAVELENGTH_TABLE)})"
+        )
+    return wl
+
+
 # CIE 1964 10-degree XYZ color matching functions (5nm resolution)
 # Columns: wavelength(nm), x_bar, y_bar, z_bar
 # Source: dispCubeAshwin.m -> colorMatchFcn('cie_1964')
