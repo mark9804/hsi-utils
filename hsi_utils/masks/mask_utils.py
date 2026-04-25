@@ -1,5 +1,5 @@
 import os
-import scipy.io as sio
+from hsi_utils.datasets.io import loadmat
 import numpy as np
 import torch
 from hsi_utils.physics import shift
@@ -32,7 +32,7 @@ def generate_masks(mask_path: str, batch_size: int) -> torch.Tensor:
     _log_mask_path_to_console(file_path)
     if not os.path.exists(file_path):
         raise FileNotFoundError(f"Mask file not found at {file_path}")
-    mask = sio.loadmat(file_path)
+    mask = loadmat(file_path)
     mask = mask["mask"]
     # mask_3d = mask["mask_3d"]
     mask3d = np.tile(mask[:, :, np.newaxis], (1, 1, 28))
@@ -76,7 +76,7 @@ def generate_shift_masks(
     """
     file_path = os.path.join(mask_path, "mask.mat")
     _log_mask_path_to_console(file_path)
-    mask_2d = sio.loadmat(file_path)["mask"]  # [H, W]
+    mask_2d = loadmat(file_path)["mask"]  # [H, W]
     H, W = mask_2d.shape
 
     # Tile to 3D and zero-pad width for spectral shift

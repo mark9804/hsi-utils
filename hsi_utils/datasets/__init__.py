@@ -9,3 +9,4 @@ from .dataset_utils import (
     shuffle_crop,
     HSIDataset,
 )
+from .io import loadmat, whosmat

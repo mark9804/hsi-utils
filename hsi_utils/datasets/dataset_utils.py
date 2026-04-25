@@ -1,6 +1,5 @@
 import os
 import random
-import scipy.io as sio
 import numpy as np
 import torch
 import tqdm
@@ -44,7 +43,9 @@ class HSIDataset(Dataset):
         return len(self.paths)
 
     def __getitem__(self, idx: int) -> torch.Tensor:  # type: ignore  # fix later
-        mat = sio.loadmat(self.paths[idx])
+        from hsi_utils.datasets.io import loadmat
+
+        mat = loadmat(self.paths[idx])
         for key in self.keys:
             if key in mat:
                 img = mat[key].astype(np.float32) * self.scale
@@ -121,7 +122,9 @@ def load_raw_data(path: Union[str, Path]) -> MatFileInfo:
             },
         }
     """
-    mat = sio.loadmat(path)
+    from hsi_utils.datasets.io import loadmat
+
+    mat = loadmat(str(path))
     return {
         "data": mat,
         "metadata": {
@@ -135,7 +138,9 @@ def load_raw_data(path: Union[str, Path]) -> MatFileInfo:
 
 def _load_single_training_scene(scene_path):
     """Load a single .mat training scene. Returns np.float32 array or None."""
-    img_dict = sio.loadmat(scene_path)
+    from hsi_utils.datasets.io import loadmat
+
+    img_dict = loadmat(scene_path)
     if "img_expand" in img_dict:
         img = img_dict["img_expand"] / 65536.0
     elif "img" in img_dict:
@@ -149,7 +154,9 @@ def _load_single_training_scene(scene_path):
 
 def _load_single_test_scene(scene_path):
     """Load a single .mat test scene. Returns np.ndarray."""
-    return sio.loadmat(scene_path)["img"]
+    from hsi_utils.datasets.io import loadmat
+
+    return loadmat(scene_path)["img"]
 
 
 def LoadTrainingLegacy(path: str, num_workers: int = 8) -> List[np.ndarray]:
@@ -229,7 +236,9 @@ def LoadMeasurement(path_test_meas: str) -> torch.Tensor:
     Returns:
         torch.Tensor: Measurement tensor.
     """
-    img = sio.loadmat(path_test_meas)["simulation_test"]
+    from hsi_utils.datasets.io import loadmat
+
+    img = loadmat(path_test_meas)["simulation_test"]
     test_data = img
     test_data = torch.from_numpy(test_data)
     return test_data
