@@ -16,8 +16,7 @@ def loadmat(
 
     Args:
         path: Path to the .mat file.
-        variable_names: Optional list of keys to load (scipy only;
-            mat73 always loads everything).
+        variable_names: Optional list of keys to selectively load.
 
     Returns:
         Dict mapping variable names to their values.
@@ -28,7 +27,8 @@ def loadmat(
     except NotImplementedError:
         import mat73
 
-        return mat73.loadmat(str(path))
+        kw = {"only_include": variable_names} if variable_names else {}
+        return mat73.loadmat(str(path), use_attrdict=True, **kw)
 
 
 def whosmat(path: Union[str, Path]) -> list[tuple[str, tuple[int, ...], str]]:
