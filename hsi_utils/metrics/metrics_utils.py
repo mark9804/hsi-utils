@@ -160,7 +160,7 @@ def torch_psnr(img: torch.Tensor, ref: torch.Tensor) -> torch.Tensor:  # input [
     img = (img * 256).round()
     ref = (ref * 256).round()
     nC = img.shape[0]
-    psnr = 0
+    psnr = torch.tensor(0.0, device=img.device)  # make type checking happy && ensure addition in the same device
     for i in range(nC):
         mse = torch.mean((img[i, :, :] - ref[i, :, :]) ** 2)
         psnr += 10 * torch.log10((255 * 255) / mse)
