@@ -20,6 +20,8 @@ configs: List[Dict[str, Optional[str]]] = [
         {"name_includes": "bisrnet", "input_setting": "H", "input_mask": "Mask"},
         {"name_includes": "cst", "input_setting": "H", "input_mask": "Mask"},
         {"name_includes": "lambda_net", "input_setting": "Y", "input_mask": "Phi"},
+        {"name_includes": "ssr", "input_setting": "Y", "input_mask": "Mask"},
+        {"name_includes": "dpu", "input_setting": "Y", "input_mask": "Mask"}
     ]
 
 def get_template(
