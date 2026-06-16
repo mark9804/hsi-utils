@@ -8,10 +8,8 @@ from hsi_utils.logger import logger, setup_logger
 
 def _log_mask_path_to_console(file_path: str) -> None:
     try:
-        if not logger.handlers:
-            setup_logger(logger.handlers[0].baseFilename)
         logger.info(f"Mask {file_path} loaded")
-    except Exception as e:
+    except Exception:
         print(f"Mask {file_path} loaded")
 
 
@@ -98,7 +96,7 @@ def generate_shift_masks(
 
 def init_mask(
     mask_path: str, mask_type: str, batch_size: int
-) -> tuple[torch.Tensor, torch.Tensor]:
+) -> tuple[torch.Tensor, torch.Tensor | tuple[torch.Tensor, torch.Tensor] | None]:
     """
     Initialize masks.
 

@@ -1,4 +1,4 @@
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from pathlib import Path
 from typing import List, Union, Optional
 from hsi_utils.templates import get_template
@@ -6,10 +6,10 @@ import argparse
 
 
 def load_merge_config(
-    args: List[str],
+    args: Union[List[str], dict],
     base_config_path: Union[Path, str, None] = None,
     inject_template: bool = False,
-) -> OmegaConf:
+) -> DictConfig:
     """Load base config and merge with CLI arguments.
 
     Args:
@@ -25,17 +25,16 @@ def load_merge_config(
         if base_config_path is None
         else OmegaConf.load(base_config_path)
     )
-    if len(args) > 0 and isinstance(args, dict):
-        args = OmegaConf.create(args)
+    if isinstance(args, dict):
+        cli_config = OmegaConf.create(args)
     elif len(args) == 0:
-        args = OmegaConf.create()
+        cli_config = OmegaConf.create()
     else:
-        args = OmegaConf.from_cli(args)
-
-    cli_config = args
+        cli_config = OmegaConf.from_cli(args)
 
     # First merge to get the potential 'template' value from CLI overriding base
     merged_config = OmegaConf.merge(base_config, cli_config)
+    assert isinstance(merged_config, DictConfig)
 
     # If template is explicitly specified, force inject
     if hasattr(merged_config, "template") and merged_config.template is not None:
@@ -54,13 +53,14 @@ def load_merge_config(
         
         if updates:
             merged_config = OmegaConf.merge(merged_config, OmegaConf.create(updates))
+            assert isinstance(merged_config, DictConfig)
 
     return merged_config
 
 
 def from_args(
     base_config_path: Union[Path, str, None] = None, inject_template: bool = False
-) -> OmegaConf:
+) -> DictConfig:
     # args = sys.argv[1:]
     args = {}
 

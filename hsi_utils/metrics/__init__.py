@@ -17,7 +17,7 @@ def _get_lpips_net():
     global _lpips_net # Init singleton LPIPS network instance
     if _lpips_net is None:
         import warnings
-        import lpips
+        import lpips  # ty:ignore[unresolved-import]
         with warnings.catch_warnings():
             warnings.filterwarnings("ignore", category=UserWarning, module="torchvision")
             _lpips_net = lpips.LPIPS(net="vgg", verbose=False).cuda().eval()
